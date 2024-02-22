@@ -1,0 +1,594 @@
+#include <SFML/Graphics.hpp>
+#include <sstream>
+
+using namespace sf;
+
+// Déclaration fonction
+void updateBranches(int seed);
+
+const int NUM_BRANCHES = 6;
+Sprite branches[NUM_BRANCHES];
+
+// Position branche/joueur
+// Gauche ou droite?
+enum class side { LEFT, RIGHT, NONE };
+side branchPositions[NUM_BRANCHES];
+
+int main()
+{
+    //Créer un mode vidéo
+    VideoMode vm(1920, 1080);
+
+    //Créer et ouvrir une fenêtre pour le jeu
+    RenderWindow window(vm, "Timber!!!", Style::Fullscreen);
+
+    // Créer une texture qui maintient l'image dans le gpu
+    Texture textureBackground;
+
+    // Charger une image dans la texture
+    textureBackground.loadFromFile("graphics/background.png");
+
+    // Créer un sprite
+    Sprite spriteBackground;
+
+    // Attacher la texture au sprite
+    spriteBackground.setTexture(textureBackground);
+
+    // Définir le spriteBackground pour couvrir la scène
+    spriteBackground.setPosition(0, 0);
+
+    // Sprite de l'arbre
+    Texture textureTree;
+    textureTree.loadFromFile("graphics/tree.png");
+    Sprite spriteTree;
+    spriteTree.setTexture(textureTree);
+    spriteTree.setPosition(810, 0);
+
+    // Sprite de l'abeille
+    Texture textureBee;
+    textureBee.loadFromFile("graphics/bee.png");
+    Sprite spriteBee;
+    spriteBee.setTexture(textureBee);
+    spriteBee.setPosition(0, 800);
+
+    // L'abeille se déplace?
+    bool beeActive = false;
+
+    // Vitesse de l'abeille
+    float beeSpeed = 0.0f;
+
+    // Faire 3 sprites de nuages à partir d'une texture
+    Texture textureCloud;
+
+    // Charger une texture
+    textureCloud.loadFromFile("graphics/cloud.png");
+
+    // 3 sprites avec la même texture
+    Sprite spriteCloud1;
+    Sprite spriteCloud2;
+    Sprite spriteCloud3;
+    spriteCloud1.setTexture(textureCloud);
+    spriteCloud2.setTexture(textureCloud);
+    spriteCloud3.setTexture(textureCloud);
+
+    // Position des nuages à gauche de l'écran à différentes hauteurs
+    spriteCloud1.setPosition(0, 0);
+    spriteCloud2.setPosition(0, 250);
+    spriteCloud3.setPosition(0, 500);
+
+    // Déplacement des nuages?
+    bool cloud1Active = false;
+    bool cloud2Active = false;
+    bool cloud3Active = false;
+
+    // Vitesse des nuages
+    float cloud1Speed = 0.0f;
+    float cloud2Speed = 0.0f;
+    float cloud3Speed = 0.0f;
+
+    // Contrôle du temps
+    Clock clock;
+
+    // Barre de temps
+    RectangleShape timeBar;
+    float timeBarStartWidth = 400;
+    float timeBarHeight = 80;
+    timeBar.setSize(Vector2f(timeBarStartWidth, timeBarHeight));
+    timeBar.setFillColor(Color::Red);
+    timeBar.setPosition((1902.0f / 2) - timeBarStartWidth / 2, 980);
+
+    Time gameTimeTotal;
+    float timeRemaining = 6.60f;
+    float timeBarWidthPerSecond = timeBarStartWidth / timeRemaining;
+
+    // Jeu en fonctionnement ou non
+    bool paused = true;
+
+    // Ajouter du texte
+    int score = 0;
+
+    Text messageText;
+    Text scoreText;
+
+    // Choix police de char
+    Font font;
+    font.loadFromFile("fonts/KOMIKAP_.ttf");
+
+    // Envoyer la police dans le message
+    messageText.setFont(font);
+    scoreText.setFont(font);
+
+    // Définir les messages
+    messageText.setString("Appuyer sur Enter pour démarrer!");
+    scoreText.setString("Score = 0");
+
+    // Définir taille
+    messageText.setCharacterSize(75);
+    scoreText.setCharacterSize(100);
+
+    // Choix couleur
+    messageText.setFillColor(Color::White);
+    scoreText.setFillColor(Color::White);
+
+    // Position texte
+    FloatRect textRect = messageText.getLocalBounds();
+    messageText.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
+
+    messageText.setPosition(1920 / 2.0f, 1080 / 2.0f);
+
+    scoreText.setPosition(20, 20);
+
+    // Préparer 6 branches
+    Texture textureBranch;
+    textureBranch.loadFromFile("graphics/branch.png");
+
+    // Définir la texture pour chaque sprite de branche
+    for (int i = 0; i < NUM_BRANCHES; i++)
+    {
+        branches[i].setTexture(textureBranch);
+        branches[i].setPosition(-2000, -2000);
+
+        //Définir l'origine du sprite au centre pour faire une rotation sans changer la position
+        branches[i].setOrigin(220, 20);
+    }
+
+    // Préparer le joueur
+    Texture texturePlayer;
+    texturePlayer.loadFromFile("graphics/player.png");
+    Sprite spritePlayer;
+    spritePlayer.setTexture(texturePlayer);
+    spritePlayer.setPosition(580, 720);
+
+    // Le joueur démarre à gauche
+    side playerSide = side::LEFT;
+
+    //Préparer la pierre tombale
+    Texture textureRIP;
+    textureRIP.loadFromFile("graphics/rip.png");
+    Sprite spriteRIP;
+    spriteRIP.setTexture(textureRIP);
+    spriteRIP.setPosition(600, 860);
+
+    // Préparer la hache
+    Texture textureAxe;
+    textureAxe.loadFromFile("graphics/axe.png");
+    Sprite spriteAxe;
+    spriteAxe.setTexture(textureAxe);
+    spriteAxe.setPosition(700, 830);
+
+    // Aligner la hache avec l'arbre
+    const float AXE_POSITION_LEFT = 700;
+    const float AXE_POSITION_RIGHT = 1075;
+
+    // Préparer la buche qui s'envole
+    Texture textureLog;
+    textureLog.loadFromFile("graphics/log.png");
+    Sprite spriteLog;
+    spriteLog.setTexture(textureLog);
+    spriteLog.setPosition(810, 720);
+
+    // Vitesse d'éjection de la buche
+    bool logActive = false;
+    float logSpeedX = 1000;
+    float logSpeedY = -1500;
+
+    bool acceptInput = false;
+
+    while (window.isOpen())
+    {
+        /*
+        ************************
+        Gérer les entrées
+        ************************
+        */
+
+        Event event;
+
+        while (window.pollEvent(event))
+        {
+            if (event.type == Event::KeyReleased && !paused)
+            {
+                // Remet acceptInput a true
+                acceptInput = true;
+
+                // Cacher la hache
+                spriteAxe.setPosition(2000, spriteAxe.getPosition().y);
+            }
+        }
+
+        // Quitter le jeu
+        if (Keyboard::isKeyPressed(Keyboard::Escape))
+        {
+            window.close();
+        }
+
+        // Démarrer le jeu
+        if (Keyboard::isKeyPressed(Keyboard::Return))
+        {
+            paused = false;
+
+            // Reset le temps et le score
+            score = 0;
+            timeRemaining = 6;
+
+            // Faire disparaitre les branches et démarrer en seconde position
+            for (int i = 1; i < NUM_BRANCHES; i++)
+            {
+                branchPositions[i] = side::NONE;
+            }
+
+            // Cacher la pierre tombale
+            spriteRIP.setPosition(675, 2000);
+
+            // Mettre le joueur en position
+            spritePlayer.setPosition(580, 720);
+
+            acceptInput = true;
+        }
+
+        // Contenir les controles joueur pour s'assurer qu'on accepte les input
+        if (acceptInput)
+        {
+            // Controle touche droite
+            if (Keyboard::isKeyPressed(Keyboard::Right))
+            {
+                // Mettre le joueur a droite
+                playerSide = side::RIGHT;
+                score++;
+
+                //Ajouter du temps
+                timeRemaining += (2 / score) + .15;
+
+                spriteAxe.setPosition(AXE_POSITION_RIGHT, spriteAxe.getPosition().y);
+
+                spritePlayer.setPosition(1200, 720);
+
+                // Mise a jour des branches
+                updateBranches(score);
+
+                // Faire voler la buche a gauche
+                spriteLog.setPosition(810, 720);
+                logSpeedX = -5000;
+                logActive = true;
+
+                acceptInput = false;
+            }
+
+            // Controle touche gauche
+            if (Keyboard::isKeyPressed(Keyboard::Left))
+            {
+                // Mettre le joueur a droite
+                playerSide = side::LEFT;
+                score++;
+
+                //Ajouter du temps
+                timeRemaining += (2 / score) + .15;
+
+                spriteAxe.setPosition(AXE_POSITION_LEFT, spriteAxe.getPosition().y);
+
+                spritePlayer.setPosition(580, 720);
+
+                // Mise a jour des branches
+                updateBranches(score);
+
+                // Faire voler la buche a droite
+                spriteLog.setPosition(810, 720);
+                logSpeedX = 5000;
+                logActive = true;
+
+                acceptInput = false;
+            }
+        }
+
+        /*
+        ************************
+        Mettre la scène à jour
+        ************************
+        */
+
+        if (!paused)
+        {
+
+            // Mesure du temps
+            Time dt = clock.restart();
+
+            // Calcul du temps restant
+            timeRemaining -= dt.asSeconds();
+            // Changer la taille de la barre
+            timeBar.setSize(Vector2f(timeBarWidthPerSecond * timeRemaining, timeBarHeight));
+
+            if (timeRemaining <= 0.0f)
+            {
+                // Mettre en pause
+                paused = true;
+
+                // Changer le message d'affichage
+                messageText.setString("Temps écoulé!!");
+
+                // Replacer le texte avec la nouvelle taille
+                FloatRect textRect = messageText.getLocalBounds();
+                messageText.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
+                messageText.setPosition(1920 / 2.0f, 1080 / 2.0f);
+            }
+
+            // Définir l'abeille
+            if (!beeActive)
+            {
+                // Vitesse de l'abeille
+                srand((int)time(0));
+                beeSpeed = (rand() % 200) + 200;
+
+                // Hauteur de l'abeille
+                srand((int)time(0) * 10);
+                float height = (rand() % 500) + 500;
+                spriteBee.setPosition(2000, height);
+                beeActive = true;
+            }
+            else
+                // Déplacement de l'abeille
+            {
+                spriteBee.setPosition(spriteBee.getPosition().x - (beeSpeed * dt.asSeconds()), spriteBee.getPosition().y);
+
+                // Si l'abeille atteint le coté gauche de l'écran
+                if (spriteBee.getPosition().x < -100)
+                {
+                    //Définir une nouvelle abeille à la frame suivante
+                    beeActive = false;
+                }
+            }
+
+            // Gestion nuages
+            // Nuage 1
+            if (!cloud1Active)
+            {
+                // Vitesse nuage
+                srand((int)time(0) * 10);
+                cloud1Speed = (rand() % 200);
+
+                // Hauteur nuage
+                srand((int)time(0) * 10);
+                float height = (rand() % 150);
+                spriteCloud1.setPosition(-200, height);
+                cloud1Active = true;
+            }
+            else
+            {
+                spriteCloud1.setPosition(spriteCloud1.getPosition().x + (cloud1Speed * dt.asSeconds()), spriteCloud1.getPosition().y);
+
+                // Si le nuage arrive au bord de l'écran
+                if (spriteCloud1.getPosition().x > 1920)
+                {
+                    cloud1Active = false;
+                }
+            }
+
+            // Nuage 2
+            if (!cloud2Active)
+            {
+                // Vitesse nuage
+                srand((int)time(0) * 20);
+                cloud2Speed = (rand() % 200);
+
+                // Hauteur nuage
+                srand((int)time(0) * 20);
+                float height = (rand() % 300) - 150;
+                spriteCloud2.setPosition(-200, height);
+                cloud2Active = true;
+            }
+            else
+            {
+                spriteCloud2.setPosition(spriteCloud2.getPosition().x + (cloud2Speed * dt.asSeconds()), spriteCloud2.getPosition().y);
+
+                // Si le nuage arrive au bord de l'écran
+                if (spriteCloud2.getPosition().x > 1920)
+                {
+                    cloud2Active = false;
+                }
+            }
+
+            // Nuage 3
+            if (!cloud3Active)
+            {
+                // Vitesse nuage
+                srand((int)time(0) * 30);
+                cloud3Speed = (rand() % 200);
+
+                // Hauteur nuage
+                srand((int)time(0) * 30);
+                float height = (rand() % 450) - 150;
+                spriteCloud3.setPosition(-200, height);
+                cloud3Active = true;
+            }
+            else
+            {
+                spriteCloud3.setPosition(spriteCloud3.getPosition().x + (cloud3Speed * dt.asSeconds()), spriteCloud3.getPosition().y);
+
+                // Si le nuage arrive au bord de l'écran
+                if (spriteCloud3.getPosition().x > 1920)
+                {
+                    cloud3Active = false;
+                }
+            }
+
+            // Mise a jour du score
+            std::stringstream ss;
+            ss << "Score = " << score;
+            scoreText.setString(ss.str());
+
+            // Mise a jour des positions de la branche
+            for (int i = 0; i < NUM_BRANCHES; i++)
+            {
+                float height = i * 150;
+
+                if (branchPositions[i] == side::LEFT)
+                {
+                    // Mettre le sprite a gauche
+                    branches[i].setPosition(610, height);
+
+                    // Rotation de la branche
+                    branches[i].setRotation(180);
+                }
+                else if (branchPositions[i] == side::RIGHT)
+                {
+                    // Mettre le sprite a droite
+                    branches[i].setPosition(1330, height);
+
+                    // Rotation normale
+                    branches[i].setRotation(0);
+                }
+                else
+                {
+                    // Cacher la branche
+                    branches[i].setPosition(3000, height);
+                }
+            }
+
+            // Gérer l'éjection de la buche
+            if (logActive)
+            {
+                spriteLog.setPosition(spriteLog.getPosition().x + (logSpeedX * dt.asSeconds()), spriteLog.getPosition().y + (logSpeedY * dt.asSeconds()));
+
+                // Gérer la buche hors champ
+                if (spriteLog.getPosition().x < -100 || spriteLog.getPosition().y > 2000)
+                {
+                    // Définir une nouvelle buche
+                    logActive = false;
+                    spriteLog.setPosition(810, 720);
+                }
+            }
+
+            // Joueur écrasé?
+            if (branchPositions[5] == playerSide)
+            {
+                // Mort
+                paused = true;
+                acceptInput = false;
+
+                // Dessiner la pierre tombale
+                spriteRIP.setPosition(525, 760);
+
+                // Cacher le joueur
+                spritePlayer.setPosition(2000, 660);
+
+                // Changer le message
+                messageText.setString("T'es mort !");
+
+                // Centrer sur l'écran
+                FloatRect textRect = messageText.getLocalBounds();
+
+                messageText.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
+
+                messageText.setPosition(1920 / 2.0f, 1080 / 2.0f);
+
+            }
+
+        } // Fin si (!paused)
+        /*
+        ************************
+        Desciner la scène
+        ************************
+        */
+
+        // Effacer tout de la dernière scène
+        window.clear();
+
+        // Dessiner notre scène
+        window.draw(spriteBackground);
+
+        // Dessiner les nuages
+        window.draw(spriteCloud1);
+        window.draw(spriteCloud2);
+        window.draw(spriteCloud3);
+
+        // Dessiner les branches
+        for (int i = 0; i < NUM_BRANCHES; i++)
+        {
+            window.draw(branches[i]);
+        }
+
+        // Dessiner l'arbre
+        window.draw(spriteTree);
+
+        // Dessiner le joueur
+        window.draw(spritePlayer);
+
+        // Dessiner la hache
+        window.draw(spriteAxe);
+
+        // Dessiner la buche
+        window.draw(spriteLog);
+
+        // Dessiner la pierre tombale
+        window.draw(spriteRIP);
+
+        // Dessiner l'abeille
+        window.draw(spriteBee);
+
+        // Afficher le score
+        window.draw(messageText);
+
+        // Dessiner la barre de temps
+        window.draw(timeBar);
+
+        // Message si pause
+        if (paused)
+        {
+            window.draw(messageText);
+        }
+
+        // Afficher tout ce qu'on a dessiner
+        window.display();
+    }
+
+    return 0;
+}
+
+// Définition de fonction
+void updateBranches(int seed)
+{
+    // Déplacer les branches vers le bas
+    for (int j = NUM_BRANCHES - 1; j > 0; j--)
+    {
+        branchPositions[j] = branchPositions[j - 1];
+    }
+
+    // Nouvelle branche en position 0
+    // LEFT, RIGHT ou NONE
+    srand((int)time(0) + seed);
+    int r = (rand() % 5);
+
+    switch (r)
+    {
+        case 0 :
+            branchPositions[0] = side::LEFT;
+            break;
+
+        case 1:
+            branchPositions[0] = side::RIGHT;
+            break;
+
+        default:
+            branchPositions[0] = side::NONE;
+            break;
+    }
+}
